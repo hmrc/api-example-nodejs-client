@@ -14,13 +14,9 @@
  * limitations under the License.
  */
 
-//const clientId = 'CLIENT_ID_HERE';
-//const clientSecret = 'CLIENT_SECRET_HERE';
-//const serverToken = 'SERVER_TOKEN_HERE';
-
-const clientId = 'VrsFzEO9GsiffqZloyFucBVebBYa';
-const clientSecret = 'a09effc0-a6b4-40f4-8025-97bda87068d9';
-const serverToken = '4a6a7cc531aa5f2f5bd02aba873cfe1';
+const clientId = 'CLIENT_ID_HERE';
+const clientSecret = 'CLIENT_SECRET_HERE';
+const serverToken = 'SERVER_TOKEN_HERE';
 
 
 const simpleOauthModule = require('simple-oauth2');
