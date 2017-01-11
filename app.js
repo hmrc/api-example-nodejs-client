@@ -18,7 +18,6 @@ const clientId = 'CLIENT_ID_HERE';
 const clientSecret = 'CLIENT_SECRET_HERE';
 const serverToken = 'SERVER_TOKEN_HERE';
 
-
 const simpleOauthModule = require('simple-oauth2');
 const request = require('superagent');
 const express = require('express');
@@ -29,10 +28,11 @@ const redirectUrl = 'http://localhost:8080/oauth20/callback';
 
 const cookieSession = require('cookie-session');
 
+// Cookies only last 3 mins to demo oauth token timing out
 app.use(cookieSession({
   name: 'session',
   keys: ['accessToken', 'caller'],
-  maxAge: 24 * 60 * 60 * 1000 // 24 hours 
+  maxAge: 3 * 60 * 1000
 }));
 
 
@@ -115,15 +115,15 @@ function callApi(resource, res, bearerToken) {
     req.set('Authorization', 'Bearer ' + bearerToken);
   }
   
-  req.end((err, res2) => handleResponse(res, err, res2));    
+  req.end((err, apiResponse) => handleResponse(res, err, apiResponse));
 }
 
-function handleResponse(res, err, res2){
-  if (err || !res2.ok) {
+function handleResponse(res, err, apiResponse){
+  if (err || !apiResponse.ok) {
     console.error(err);
     res.send(err);
   } else {
-    res.send(JSON.stringify(res2.body));
+    res.send(apiResponse.body);
   }
 };
 
