@@ -28,11 +28,10 @@ const redirectUrl = 'http://localhost:8080/oauth20/callback';
 
 const cookieSession = require('cookie-session');
 
-// Cookies only last 3 mins to demo oauth token timing out
 app.use(cookieSession({
   name: 'session',
-  keys: ['accessToken', 'caller'],
-  maxAge: 3 * 60 * 1000
+  keys: ['oauth2Token', 'caller'],
+  maxAge: 24 * 60 * 60 * 1000 // 24 hours
 }));
 
 
@@ -75,9 +74,26 @@ app.get("/hello-application",(req,res) => {
 
 // Say hello user is an example of a user-restricted endpoint
 app.get("/hello-user",(req,res) => {
-  if(req.session.accessToken){
-    callApi('/user', res, req.session.accessToken);
+  if(req.session.oauth2Token){
+    var accessToken = oauth2.accessToken.create(req.session.oauth2Token);
+
+    log('*** got session token ' + toString(accessToken.token));
+
+    if(accessToken.expired()){
+        log('*** token expired ***')
+        accessToken.refresh()
+          .then((result) => {
+            log('*** refreshed token ' + toString(result.token));
+            req.session.oauth2Token = result.token;
+            callApi('/user', res, result.token.access_token);
+          }, function (error) {
+                 console.error('Error refreshing token', error);
+           });
+    } else {
+      callApi('/user', res, accessToken.token.access_token);
+    }
   } else {
+    log('*** need to request token')
     req.session.caller = '/hello-user';
     res.redirect(authorizationUri);
   }
@@ -96,9 +112,10 @@ app.get('/oauth20/callback', (req, res) => {
       console.error('Access Token Error', error);
       return res.json('Authentication failed');
     }
-    
+
+    log('*** got token ' + toString(result));
     // save token on session and return to calling page
-    req.session.accessToken = result.access_token;   
+    req.session.oauth2Token = result;
     res.redirect(req.session.caller);
   });
 });
@@ -112,6 +129,7 @@ function callApi(resource, res, bearerToken) {
     .accept('application/vnd.hmrc.1.0+json');
   
   if(bearerToken) {
+    log('*** using bearer token: ' + bearerToken);
     req.set('Authorization', 'Bearer ' + bearerToken);
   }
   
@@ -127,6 +145,14 @@ function handleResponse(res, err, apiResponse){
   }
 };
 
+function toString(token){
+  return "[A:" + token.access_token + " R:" + token.refresh_token + " X:" + token.expires_at + "]";
+}
+
+function log(message){
+  console.log(new Date() + ' : ' + message);
+}
+
 app.listen(8080,() => {
-  console.log("Started at http://localhost:8080");
+  log("Started at http://localhost:8080");
 });
