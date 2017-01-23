@@ -23,8 +23,25 @@ const request = require('superagent');
 const express = require('express');
 const app = express();
 
+const dateFormat = require('dateformat');
+const winston = require('winston');
+
+const log = new (winston.Logger)({
+  transports: [
+    new (winston.transports.Console)({
+      timestamp: function() {
+        return dateFormat(Date.now(), "isoDateTime");
+      },
+      formatter: function(options) {
+        return options.timestamp() +' '+ options.level.toUpperCase() +' '+ (options.message ? options.message : '') +
+          (options.meta && Object.keys(options.meta).length ? JSON.stringify(options.meta) : '' );
+      }
+    })
+  ]
+});
+
 const apiBaseUrl = 'https://api.service.hmrc.gov.uk';
-const redirectUrl = 'http://localhost:8080/oauth20/callback';
+const redirectUri = 'http://localhost:8080/oauth20/callback';
 
 const cookieSession = require('cookie-session');
 
@@ -50,7 +67,7 @@ const oauth2 = simpleOauthModule.create({
 
 // Authorization uri definition
 const authorizationUri = oauth2.authorizationCode.authorizeURL({
-  redirect_uri: redirectUrl,
+  redirect_uri: redirectUri,
   response_type: 'code',
   scope: 'hello',
 });
@@ -77,23 +94,23 @@ app.get("/hello-user",(req,res) => {
   if(req.session.oauth2Token){
     var accessToken = oauth2.accessToken.create(req.session.oauth2Token);
 
-    log('*** got session token ' + toString(accessToken.token));
-
     if(accessToken.expired()){
-        log('*** token expired ***')
+        log.info('Token expired: ', accessToken.token);
         accessToken.refresh()
           .then((result) => {
-            log('*** refreshed token ' + toString(result.token));
+            log.info('Refreshed token: ', result.token);
             req.session.oauth2Token = result.token;
             callApi('/user', res, result.token.access_token);
-          }, function (error) {
-                 console.error('Error refreshing token', error);
+          })
+          .catch(function (error) {
+            log.error('Error refreshing token: ', error);
            });
     } else {
+      log.info('Using token from session: ', accessToken.token);
       callApi('/user', res, accessToken.token.access_token);
     }
   } else {
-    log('*** need to request token')
+    log.info('Need to request token')
     req.session.caller = '/hello-user';
     res.redirect(authorizationUri);
   }
@@ -101,19 +118,18 @@ app.get("/hello-user",(req,res) => {
 
 // Callback service parsing the authorization token and asking for the access token
 app.get('/oauth20/callback', (req, res) => {
-  const code = req.query.code;
   const options = {
-    redirect_uri: redirectUrl,
-    code,
+    redirect_uri: redirectUri,
+    code: req.query.code
   };
 
   oauth2.authorizationCode.getToken(options, (error, result) => {
     if (error) {
-      console.error('Access Token Error', error);
+      log.error('Access Token Error: ', error);
       return res.json('Authentication failed');
     }
 
-    log('*** got token ' + toString(result));
+    log.info('Got token: ', result);
     // save token on session and return to calling page
     req.session.oauth2Token = result;
     res.redirect(req.session.caller);
@@ -129,7 +145,7 @@ function callApi(resource, res, bearerToken) {
     .accept('application/vnd.hmrc.1.0+json');
   
   if(bearerToken) {
-    log('*** using bearer token: ' + bearerToken);
+    log.info('Using bearer token:', bearerToken);
     req.set('Authorization', 'Bearer ' + bearerToken);
   }
   
@@ -145,14 +161,10 @@ function handleResponse(res, err, apiResponse){
   }
 };
 
-function toString(token){
-  return "[A:" + token.access_token + " R:" + token.refresh_token + " X:" + token.expires_at + "]";
-}
-
-function log(message){
-  console.log(new Date() + ' : ' + message);
+function str(token){
+  return `[A:${token.access_token} R:${token.refresh_token} X:${token.expires_at}]`;
 }
 
 app.listen(8080,() => {
-  log("Started at http://localhost:8080");
+  log.info('Started at http://localhost:8080');
 });
