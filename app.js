@@ -48,7 +48,7 @@ const cookieSession = require('cookie-session');
 app.use(cookieSession({
   name: 'session',
   keys: ['oauth2Token', 'caller'],
-  maxAge: 24 * 60 * 60 * 1000 // 24 hours
+  maxAge: 10 * 60 * 60 * 1000 // 10 hours
 }));
 
 
@@ -102,8 +102,9 @@ app.get("/hello-user",(req,res) => {
             req.session.oauth2Token = result.token;
             callApi('/user', res, result.token.access_token);
           })
-          .catch(function (error) {
+          .catch((error) => {
             log.error('Error refreshing token: ', error);
+            res.send(error);
            });
     } else {
       log.info('Using token from session: ', accessToken.token);
@@ -154,7 +155,7 @@ function callApi(resource, res, bearerToken) {
 
 function handleResponse(res, err, apiResponse){
   if (err || !apiResponse.ok) {
-    console.error(err);
+    log.error('Handling error response: ', err);
     res.send(err);
   } else {
     res.send(apiResponse.body);
