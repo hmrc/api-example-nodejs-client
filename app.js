@@ -23,16 +23,32 @@ const request = require('superagent');
 const express = require('express');
 const app = express();
 
+const dateFormat = require('dateformat');
+const winston = require('winston');
+
+const log = new (winston.Logger)({
+  transports: [
+    new (winston.transports.Console)({
+      timestamp: function() {
+        return dateFormat(Date.now(), "isoDateTime");
+      },
+      formatter: function(options) {
+        return options.timestamp() +' '+ options.level.toUpperCase() +' '+ (options.message ? options.message : '') +
+          (options.meta && Object.keys(options.meta).length ? JSON.stringify(options.meta) : '' );
+      }
+    })
+  ]
+});
+
 const apiBaseUrl = 'https://api.service.hmrc.gov.uk';
-const redirectUrl = 'http://localhost:8080/oauth20/callback';
+const redirectUri = 'http://localhost:8080/oauth20/callback';
 
 const cookieSession = require('cookie-session');
 
-// Cookies only last 3 mins to demo oauth token timing out
 app.use(cookieSession({
   name: 'session',
-  keys: ['accessToken', 'caller'],
-  maxAge: 3 * 60 * 1000
+  keys: ['oauth2Token', 'caller'],
+  maxAge: 10 * 60 * 60 * 1000 // 10 hours
 }));
 
 
@@ -51,7 +67,7 @@ const oauth2 = simpleOauthModule.create({
 
 // Authorization uri definition
 const authorizationUri = oauth2.authorizationCode.authorizeURL({
-  redirect_uri: redirectUrl,
+  redirect_uri: redirectUri,
   response_type: 'code',
   scope: 'hello',
 });
@@ -75,9 +91,27 @@ app.get("/hello-application",(req,res) => {
 
 // Say hello user is an example of a user-restricted endpoint
 app.get("/hello-user",(req,res) => {
-  if(req.session.accessToken){
-    callApi('/user', res, req.session.accessToken);
+  if(req.session.oauth2Token){
+    var accessToken = oauth2.accessToken.create(req.session.oauth2Token);
+
+    if(accessToken.expired()){
+        log.info('Token expired: ', accessToken.token);
+        accessToken.refresh()
+          .then((result) => {
+            log.info('Refreshed token: ', result.token);
+            req.session.oauth2Token = result.token;
+            callApi('/user', res, result.token.access_token);
+          })
+          .catch((error) => {
+            log.error('Error refreshing token: ', error);
+            res.send(error);
+           });
+    } else {
+      log.info('Using token from session: ', accessToken.token);
+      callApi('/user', res, accessToken.token.access_token);
+    }
   } else {
+    log.info('Need to request token')
     req.session.caller = '/hello-user';
     res.redirect(authorizationUri);
   }
@@ -85,20 +119,20 @@ app.get("/hello-user",(req,res) => {
 
 // Callback service parsing the authorization token and asking for the access token
 app.get('/oauth20/callback', (req, res) => {
-  const code = req.query.code;
   const options = {
-    redirect_uri: redirectUrl,
-    code,
+    redirect_uri: redirectUri,
+    code: req.query.code
   };
 
   oauth2.authorizationCode.getToken(options, (error, result) => {
     if (error) {
-      console.error('Access Token Error', error);
+      log.error('Access Token Error: ', error);
       return res.json('Authentication failed');
     }
-    
+
+    log.info('Got token: ', result);
     // save token on session and return to calling page
-    req.session.accessToken = result.access_token;   
+    req.session.oauth2Token = result;
     res.redirect(req.session.caller);
   });
 });
@@ -112,6 +146,7 @@ function callApi(resource, res, bearerToken) {
     .accept('application/vnd.hmrc.1.0+json');
   
   if(bearerToken) {
+    log.info('Using bearer token:', bearerToken);
     req.set('Authorization', 'Bearer ' + bearerToken);
   }
   
@@ -120,13 +155,17 @@ function callApi(resource, res, bearerToken) {
 
 function handleResponse(res, err, apiResponse){
   if (err || !apiResponse.ok) {
-    console.error(err);
+    log.error('Handling error response: ', err);
     res.send(err);
   } else {
     res.send(apiResponse.body);
   }
 };
 
+function str(token){
+  return `[A:${token.access_token} R:${token.refresh_token} X:${token.expires_at}]`;
+}
+
 app.listen(8080,() => {
-  console.log("Started at http://localhost:8080");
+  log.info('Started at http://localhost:8080');
 });

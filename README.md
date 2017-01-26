@@ -17,7 +17,7 @@ API documentation is available at https://developer.service.hmrc.gov.uk/api-docu
 
 Application developers need to register with the platform and will be provided with key, secret and tokens upon registration.
 
-The node dependancies can be installed locally by running:
+The node dependencies can be installed locally by running:
 ```
 npm install
 ```
