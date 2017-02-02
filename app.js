@@ -18,6 +18,17 @@ const clientId = 'CLIENT_ID_HERE';
 const clientSecret = 'CLIENT_SECRET_HERE';
 const serverToken = 'SERVER_TOKEN_HERE';
 
+const apiBaseUrl = 'https://api.service.hmrc.gov.uk';
+const servicePath = '/hello'
+const serviceVersion = '1.0'
+
+const unRestrictedEndpoint = '/world';
+const appRestrictedEndpoint = '/application';
+const userRestrictedEndpoint = '/user';
+
+const oauthScope = 'hello';
+
+
 const simpleOauthModule = require('simple-oauth2');
 const request = require('superagent');
 const express = require('express');
@@ -40,7 +51,6 @@ const log = new (winston.Logger)({
   ]
 });
 
-const apiBaseUrl = 'https://api.service.hmrc.gov.uk';
 const redirectUri = 'http://localhost:8080/oauth20/callback';
 
 const cookieSession = require('cookie-session');
@@ -69,7 +79,7 @@ const oauth2 = simpleOauthModule.create({
 const authorizationUri = oauth2.authorizationCode.authorizeURL({
   redirect_uri: redirectUri,
   response_type: 'code',
-  scope: 'hello',
+  scope: oauthScope,
 });
 
 // Route definitions...
@@ -81,12 +91,12 @@ app.get('/', (req, res) => {
 
 // Say hello world is an example of an unrestricted endpoint
 app.get("/hello-world",(req,res) => {
-    callApi('/world', res);
+    callApi(unRestrictedEndpoint, res);
 });
 
 // Say hello application is an example of an application-restricted endpoint 
 app.get("/hello-application",(req,res) => {
-  callApi('/application', res, serverToken);
+  callApi(appRestrictedEndpoint, res, serverToken);
 });
 
 // Say hello user is an example of a user-restricted endpoint
@@ -100,7 +110,7 @@ app.get("/hello-user",(req,res) => {
           .then((result) => {
             log.info('Refreshed token: ', result.token);
             req.session.oauth2Token = result.token;
-            callApi('/user', res, result.token.access_token);
+            callApi(userRestrictedEndpoint, res, result.token.access_token);
           })
           .catch((error) => {
             log.error('Error refreshing token: ', error);
@@ -108,7 +118,7 @@ app.get("/hello-user",(req,res) => {
            });
     } else {
       log.info('Using token from session: ', accessToken.token);
-      callApi('/user', res, accessToken.token.access_token);
+      callApi(userRestrictedEndpoint, res, accessToken.token.access_token);
     }
   } else {
     log.info('Need to request token')
@@ -141,9 +151,11 @@ app.get('/oauth20/callback', (req, res) => {
 // Helper functions
 
 function callApi(resource, res, bearerToken) {
+  const acceptHeader = 'application/vnd.hmrc.' + serviceVersion + '+json';
+  log.info('Calling "' + apiBaseUrl + servicePath + resource + '" with "' + acceptHeader + '"');
   const req = request
-    .get(apiBaseUrl + '/hello' + resource)
-    .accept('application/vnd.hmrc.1.0+json');
+    .get(apiBaseUrl + servicePath + resource)
+    .accept(acceptHeader);
   
   if(bearerToken) {
     log.info('Using bearer token:', bearerToken);
