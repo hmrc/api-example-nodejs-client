@@ -14,19 +14,19 @@
  * limitations under the License.
  */
 
-const clientId = 'CLIENT_ID_HERE';
-const clientSecret = 'CLIENT_SECRET_HERE';
-const serverToken = 'SERVER_TOKEN_HERE';
+const clientId = 'yhX3g2V8TV5owgNnMmK9f0fVFbYa';
+const clientSecret = '2b46b582-321c-4f70-abcc-dc8cd7933951';
+const serverToken = 'd47773e139ebf8abeb9b22acef4972b6';
 
-const apiBaseUrl = 'https://api.service.hmrc.gov.uk';
-const servicePath = '/hello'
+const apiBaseUrl = 'https://externaltest-api.tax.service.gov.uk';
+const servicePath = ''
 const serviceVersion = '1.0'
 
 const unRestrictedEndpoint = '/world';
 const appRestrictedEndpoint = '/application';
 const userRestrictedEndpoint = '/user';
 
-const oauthScope = 'hello';
+const oauthScope = 'read:national-insurance';
 
 
 const simpleOauthModule = require('simple-oauth2');
@@ -73,7 +73,7 @@ const oauth2 = simpleOauthModule.create({
     tokenPath: '/oauth/token',
     authorizePath: '/oauth/authorize',
   },
-});  
+});
 
 // Authorization uri definition
 const authorizationUri = oauth2.authorizationCode.authorizeURL({
@@ -94,7 +94,7 @@ app.get("/hello-world",(req,res) => {
     callApi(unRestrictedEndpoint, res);
 });
 
-// Say hello application is an example of an application-restricted endpoint 
+// Say hello application is an example of an application-restricted endpoint
 app.get("/hello-application",(req,res) => {
   callApi(appRestrictedEndpoint, res, serverToken);
 });
@@ -123,6 +123,34 @@ app.get("/hello-user",(req,res) => {
   } else {
     log.info('Need to request token')
     req.session.caller = '/hello-user';
+    res.redirect(authorizationUri);
+  }
+});
+
+// Say hello user is an example of a user-restricted endpoint
+app.get("/national-insurance",(req,res) => {
+  if(req.session.oauth2Token){
+    var accessToken = oauth2.accessToken.create(req.session.oauth2Token);
+
+    if(accessToken.expired()){
+        log.info('Token expired: ', accessToken.token);
+        accessToken.refresh()
+          .then((result) => {
+            log.info('Refreshed token: ', result.token);
+            req.session.oauth2Token = result.token;
+            callApi('/national-insurance/sa/1000070051/annual-summary/2014-15', res, result.token.access_token);
+          })
+          .catch((error) => {
+            log.error('Error refreshing token: ', error);
+            res.send(error);
+           });
+    } else {
+      log.info('Using token from session: ', accessToken.token);
+      callApi('/national-insurance/sa/1000070051/annual-summary/2014-15', res, accessToken.token.access_token);
+    }
+  } else {
+    log.info('Need to request token')
+    req.session.caller = '/national-insurance';
     res.redirect(authorizationUri);
   }
 });
@@ -156,12 +184,12 @@ function callApi(resource, res, bearerToken) {
   const req = request
     .get(apiBaseUrl + servicePath + resource)
     .accept(acceptHeader);
-  
+
   if(bearerToken) {
     log.info('Using bearer token:', bearerToken);
     req.set('Authorization', 'Bearer ' + bearerToken);
   }
-  
+
   req.end((err, apiResponse) => handleResponse(res, err, apiResponse));
 }
 
