@@ -21,6 +21,7 @@ const serverToken = 'SERVER_TOKEN_HERE';
 
 const apiBaseUrl = 'https://api.service.hmrc.gov.uk/';
 const serviceName = 'hello'
+
 const serviceVersion = '1.0'
 
 const unRestrictedEndpoint = '/world';
@@ -107,6 +108,7 @@ app.get("/unrestrictedCall",(req,res) => {
 
 // Call an application-restricted endpoint
 app.get("/applicationCall",(req,res) => {
+
   callApi(appRestrictedEndpoint, res, serverToken);
 });
 
