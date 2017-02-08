@@ -14,12 +14,13 @@
  * limitations under the License.
  */
 
+// Start Client configuration
 const clientId = 'CLIENT_ID_HERE';
 const clientSecret = 'CLIENT_SECRET_HERE';
 const serverToken = 'SERVER_TOKEN_HERE';
 
-const apiBaseUrl = 'https://api.service.hmrc.gov.uk';
-const servicePath = '/hello'
+const apiBaseUrl = 'https://api.service.hmrc.gov.uk/';
+const serviceName = 'hello'
 const serviceVersion = '1.0'
 
 const unRestrictedEndpoint = '/world';
@@ -27,12 +28,17 @@ const appRestrictedEndpoint = '/application';
 const userRestrictedEndpoint = '/user';
 
 const oauthScope = 'hello';
+// End Client configuration
 
+const xsessionidBase = 'NC-'
 
 const simpleOauthModule = require('simple-oauth2');
 const request = require('superagent');
 const express = require('express');
 const app = express();
+
+// set the view engine to ejs
+app.set('view engine', 'ejs');
 
 const dateFormat = require('dateformat');
 const winston = require('winston');
@@ -41,7 +47,7 @@ const log = new (winston.Logger)({
   transports: [
     new (winston.transports.Console)({
       timestamp: function() {
-        return dateFormat(Date.now(), "isoDateTime");
+        return timestamp();
       },
       formatter: function(options) {
         return options.timestamp() +' '+ options.level.toUpperCase() +' '+ (options.message ? options.message : '') +
@@ -86,21 +92,26 @@ const authorizationUri = oauth2.authorizationCode.authorizeURL({
 
 // home-page route
 app.get('/', (req, res) => {
-  res.sendFile(__dirname + "/index.html");
+  res.render('index', {
+    service: serviceName + ' (v' + serviceVersion + ')',
+    unRestrictedEndpoint: unRestrictedEndpoint,
+    appRestrictedEndpoint: appRestrictedEndpoint,
+    userRestrictedEndpoint: userRestrictedEndpoint
+  });
 });
 
-// Say hello world is an example of an unrestricted endpoint
-app.get("/hello-world",(req,res) => {
+// Call an unrestricted endpoint
+app.get("/unrestrictedCall",(req,res) => {
     callApi(unRestrictedEndpoint, res);
 });
 
-// Say hello application is an example of an application-restricted endpoint 
-app.get("/hello-application",(req,res) => {
+// Call an application-restricted endpoint
+app.get("/applicationCall",(req,res) => {
   callApi(appRestrictedEndpoint, res, serverToken);
 });
 
-// Say hello user is an example of a user-restricted endpoint
-app.get("/hello-user",(req,res) => {
+// Call a user-restricted endpoint
+app.get("/userCall",(req,res) => {
   if(req.session.oauth2Token){
     var accessToken = oauth2.accessToken.create(req.session.oauth2Token);
 
@@ -122,7 +133,7 @@ app.get("/hello-user",(req,res) => {
     }
   } else {
     log.info('Need to request token')
-    req.session.caller = '/hello-user';
+    req.session.caller = '/userCall';
     res.redirect(authorizationUri);
   }
 });
@@ -152,9 +163,11 @@ app.get('/oauth20/callback', (req, res) => {
 
 function callApi(resource, res, bearerToken) {
   const acceptHeader = 'application/vnd.hmrc.' + serviceVersion + '+json';
-  log.info('Calling "' + apiBaseUrl + servicePath + resource + '" with "' + acceptHeader + '"');
+  const xsessionid = xsessionidBase + timestamp();
+  log.info('Calling "' + apiBaseUrl + serviceName + resource + '" with "' + acceptHeader + '"' + ' and x-session-id "' + xsessionid + '"' );
   const req = request
-    .get(apiBaseUrl + servicePath + resource)
+    .get(apiBaseUrl + serviceName + resource)
+    .set('x-session-id', xsessionid)
     .accept(acceptHeader);
   
   if(bearerToken) {
@@ -176,6 +189,10 @@ function handleResponse(res, err, apiResponse){
 
 function str(token){
   return `[A:${token.access_token} R:${token.refresh_token} X:${token.expires_at}]`;
+}
+
+function timestamp() {
+  return dateFormat(Date.now(), "isoDateTime");
 }
 
 app.listen(8080,() => {

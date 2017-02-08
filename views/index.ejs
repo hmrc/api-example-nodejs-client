@@ -12,41 +12,41 @@
     <nav class="navbar navbar-default">
         <div class="container-fluid">
             <div class="navbar-header">
-                <a class="navbar-brand" href="#">hello-world API</a>
+                <a class="navbar-brand" href="#">api-example-nodejs-client</a>
             </div>
         </div>
     </nav>
 
-    <h1>hello-world API example</h1>
+    <h1>Testing <%= service %> API</h1>
 
     <div>
         <table class="table table-striped table-hover">
             <thead>
             <tr>
-                <th>endpoint</th>
-                <th>description</th>
+                <th>Endpoint</th>
+                <th>Description</th>
             </tr>
             </thead>
             <tbody>
             <tr>
-                <td>/hello/world</td>
-                <td>Say Hello World</td>
+                <td><%= unRestrictedEndpoint %></td>
+                <td>Unrestricted endpoint</td>
                 <td>
-                    <a class="btn btn-primary" href="hello-world">Try it</a>
+                    <a class="btn btn-primary" href="unrestrictedCall">Try it</a>
                 </td>
             </tr>
             <tr>
-                <td>/hello/application</td>
-                <td>Say Hello Application</td>
+                <td><%= appRestrictedEndpoint %></td>
+                <td>Application restricted endpoint</td>
                 <td>
-                    <a class="btn btn-primary" href="hello-application">Try it</a>
+                    <a class="btn btn-primary" href="applicationCall">Try it</a>
                 </td>
             </tr>
             <tr>
-                <td>/hello/user</td>
-                <td>Say Hello User</td>
+                <td><%= userRestrictedEndpoint %></td>
+                <td>User restricted endpoint</td>
                 <td>
-                    <a class="btn btn-primary" href="hello-user">Try it</a>
+                    <a class="btn btn-primary" href="userCall">Try it</a>
                 </td>
             </tr>
             </tbody>
