@@ -31,8 +31,6 @@ const userRestrictedEndpoint = '/user';
 const oauthScope = 'hello';
 // End Client configuration
 
-const xsessionidBase = 'NC-'
-
 const simpleOauthModule = require('simple-oauth2');
 const request = require('superagent');
 const express = require('express');
@@ -47,13 +45,9 @@ const winston = require('winston');
 const log = new (winston.Logger)({
   transports: [
     new (winston.transports.Console)({
-      timestamp: function() {
-        return timestamp();
-      },
-      formatter: function(options) {
-        return options.timestamp() +' '+ options.level.toUpperCase() +' '+ (options.message ? options.message : '') +
-          (options.meta && Object.keys(options.meta).length ? JSON.stringify(options.meta) : '' );
-      }
+      timestamp: () => timestamp(),
+      formatter: (options) => `${options.timestamp()} ${options.level.toUpperCase()} ${options.message ? options.message : ''}
+          ${options.meta && Object.keys(options.meta).length ? JSON.stringify(options.meta) : ''}`
     })
   ]
 });
@@ -94,7 +88,7 @@ const authorizationUri = oauth2.authorizationCode.authorizeURL({
 // home-page route
 app.get('/', (req, res) => {
   res.render('index', {
-    service: serviceName + ' (v' + serviceVersion + ')',
+    service: `${serviceName} (v${serviceVersion})`,
     unRestrictedEndpoint: unRestrictedEndpoint,
     appRestrictedEndpoint: appRestrictedEndpoint,
     userRestrictedEndpoint: userRestrictedEndpoint
@@ -164,17 +158,16 @@ app.get('/oauth20/callback', (req, res) => {
 // Helper functions
 
 function callApi(resource, res, bearerToken) {
-  const acceptHeader = 'application/vnd.hmrc.' + serviceVersion + '+json';
-  const xsessionid = xsessionidBase + timestamp();
-  log.info('Calling "' + apiBaseUrl + serviceName + resource + '" with "' + acceptHeader + '"' + ' and x-session-id "' + xsessionid + '"' );
+  const acceptHeader = `application/vnd.hmrc.${serviceVersion}+json`;
+  const url = apiBaseUrl + serviceName + resource;
+  log.info(`Calling ${url} with Accept: ${acceptHeader}`);
   const req = request
-    .get(apiBaseUrl + serviceName + resource)
-    .set('x-session-id', xsessionid)
+    .get(url)
     .accept(acceptHeader);
   
   if(bearerToken) {
     log.info('Using bearer token:', bearerToken);
-    req.set('Authorization', 'Bearer ' + bearerToken);
+    req.set('Authorization', `Bearer ${bearerToken}`);
   }
   
   req.end((err, apiResponse) => handleResponse(res, err, apiResponse));
