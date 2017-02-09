@@ -45,7 +45,7 @@ const winston = require('winston');
 const log = new (winston.Logger)({
   transports: [
     new (winston.transports.Console)({
-      timestamp: () => timestamp(),
+      timestamp: () => dateFormat(Date.now(), "isoDateTime"),
       formatter: (options) => `${options.timestamp()} ${options.level.toUpperCase()} ${options.message ? options.message : ''}
           ${options.meta && Object.keys(options.meta).length ? JSON.stringify(options.meta) : ''}`
     })
@@ -184,10 +184,6 @@ function handleResponse(res, err, apiResponse){
 
 function str(token){
   return `[A:${token.access_token} R:${token.refresh_token} X:${token.expires_at}]`;
-}
-
-function timestamp() {
-  return dateFormat(Date.now(), "isoDateTime");
 }
 
 app.listen(8080,() => {
