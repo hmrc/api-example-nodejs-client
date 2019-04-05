@@ -13,6 +13,8 @@ The implementation of the Hello User flow requests an OAuth 2.0 token and subseq
 
 The parameters clientId, clientSecret and serverToken will need to be updated in [`app.js`](app.js)
 
+You will need to add the Redirect URI 'http://localhost:8080' to your application ('https://developer.service.hmrc.gov.uk/developer/applications/').
+
 API documentation is available at https://developer.service.hmrc.gov.uk/api-documentation
 
 Application developers need to register with the platform and will be provided with key, secret and tokens upon registration.
