@@ -156,7 +156,6 @@ app.get('/oauth20/callback', (req, res) => {
 
 
 // Helper functions
-
 function callApi(resource, res, bearerToken) {
   const acceptHeader = `application/vnd.hmrc.${serviceVersion}+json`;
   const url = apiBaseUrl + serviceName + resource;
