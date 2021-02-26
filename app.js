@@ -29,14 +29,12 @@ const appRestrictedEndpoint = '/application';
 const userRestrictedEndpoint = '/user';
 
 const oauthScope = 'hello';
-// End Client configuration
 
-const simpleOauthModule = require('simple-oauth2');
+const { AuthorizationCode } = require('simple-oauth2');
 const request = require('superagent');
 const express = require('express');
 const app = express();
 
-// set the view engine to ejs
 app.set('view engine', 'ejs');
 
 const dateFormat = require('dateformat');
@@ -62,9 +60,7 @@ app.use(cookieSession({
   maxAge: 10 * 60 * 60 * 1000 // 10 hours
 }));
 
-
-// OAuth2 module
-const oauth2 = simpleOauthModule.create({
+const client = new AuthorizationCode({
   client: {
     id: clientId,
     secret: clientSecret,
@@ -74,16 +70,12 @@ const oauth2 = simpleOauthModule.create({
     tokenPath: '/oauth/token',
     authorizePath: '/oauth/authorize',
   },
-});  
-
-// Authorization uri definition
-const authorizationUri = oauth2.authorizationCode.authorizeURL({
-  redirect_uri: redirectUri,
-  response_type: 'code',
-  scope: oauthScope,
 });
 
-// Route definitions...
+const authorizationUri = client.authorizeURL({
+  redirect_uri: redirectUri,
+  scope: oauthScope,
+});
 
 // home-page route
 app.get('/', (req, res) => {
@@ -96,83 +88,70 @@ app.get('/', (req, res) => {
 });
 
 // Call an unrestricted endpoint
-app.get("/unrestrictedCall",(req,res) => {
-    callApi(unRestrictedEndpoint, res);
+app.get("/unrestrictedCall", (req, res) => {
+  callApi(unRestrictedEndpoint, res);
 });
 
 // Call an application-restricted endpoint
-app.get("/applicationCall",(req,res) => {
-
+app.get("/applicationCall", (req, res) => {
   callApi(appRestrictedEndpoint, res, serverToken);
 });
 
 // Call a user-restricted endpoint
-app.get("/userCall",(req,res) => {
-  if(req.session.oauth2Token){
-    var accessToken = oauth2.accessToken.create(req.session.oauth2Token);
+app.get("/userCall", (req, res) => {
+  if (req.session.oauth2Token) {
+    var accessToken = client.createToken(req.session.oauth2Token);
 
-    if(accessToken.expired()){
-        log.info('Token expired: ', accessToken.token);
-        accessToken.refresh()
-          .then((result) => {
-            log.info('Refreshed token: ', result.token);
-            req.session.oauth2Token = result.token;
-            callApi(userRestrictedEndpoint, res, result.token.access_token);
-          })
-          .catch((error) => {
-            log.error('Error refreshing token: ', error);
-            res.send(error);
-           });
-    } else {
-      log.info('Using token from session: ', accessToken.token);
-      callApi(userRestrictedEndpoint, res, accessToken.token.access_token);
-    }
+    log.info('Using token from session: ', accessToken.token);
+
+    callApi(userRestrictedEndpoint, res, accessToken.token.access_token);
   } else {
-    log.info('Need to request token')
     req.session.caller = '/userCall';
     res.redirect(authorizationUri);
   }
 });
 
 // Callback service parsing the authorization token and asking for the access token
-app.get('/oauth20/callback', (req, res) => {
+app.get('/oauth20/callback', async (req, res) => {
+  const { code } = req.query;
   const options = {
+    code: code,
     redirect_uri: redirectUri,
-    code: req.query.code
+    client_id: clientId,
+    client_secret: clientSecret,
   };
 
-  oauth2.authorizationCode.getToken(options, (error, result) => {
-    if (error) {
-      log.error('Access Token Error: ', error);
-      return res.json('Authentication failed');
-    }
+  try {
+    const accessToken = await client.getToken(options);
 
-    log.info('Got token: ', result);
-    // save token on session and return to calling page
-    req.session.oauth2Token = result;
-    res.redirect(req.session.caller);
-  });
+    req.session.oauth2Token = accessToken;
+
+    return res.redirect(req.session.caller);
+  } catch(error) {
+    return res.status(500).json('Authentication failed');
+  }
 });
-
 
 // Helper functions
 function callApi(resource, res, bearerToken) {
   const acceptHeader = `application/vnd.hmrc.${serviceVersion}+json`;
   const url = apiBaseUrl + serviceName + resource;
+  
   log.info(`Calling ${url} with Accept: ${acceptHeader}`);
+
   const req = request
     .get(url)
     .accept(acceptHeader);
-  
+
   if(bearerToken) {
     log.info('Using bearer token:', bearerToken);
     req.set('Authorization', `Bearer ${bearerToken}`);
   }
-  
+
   req.end((err, apiResponse) => handleResponse(res, err, apiResponse));
 }
 
-function handleResponse(res, err, apiResponse){
+function handleResponse(res, err, apiResponse) {
   if (err || !apiResponse.ok) {
     log.error('Handling error response: ', err);
     res.send(err);
@@ -181,10 +160,6 @@ function handleResponse(res, err, apiResponse){
   }
 };
 
-function str(token){
-  return `[A:${token.access_token} R:${token.refresh_token} X:${token.expires_at}]`;
-}
-
-app.listen(8080,() => {
+app.listen(8080, () => {
   log.info('Started at http://localhost:8080');
 });
