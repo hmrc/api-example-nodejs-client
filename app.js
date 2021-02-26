@@ -124,14 +124,10 @@ app.get('/oauth20/callback', async (req, res) => {
   try {
     const accessToken = await client.getToken(options);
 
-    console.log('The resulting token: ', accessToken);
-
     req.session.oauth2Token = accessToken;
 
     return res.redirect(req.session.caller);
   } catch(error) {
-    console.error('Access Token Error', error.message);
-    console.error(error);
     return res.status(500).json('Authentication failed');
   }
 });
@@ -140,12 +136,14 @@ app.get('/oauth20/callback', async (req, res) => {
 function callApi(resource, res, bearerToken) {
   const acceptHeader = `application/vnd.hmrc.${serviceVersion}+json`;
   const url = apiBaseUrl + serviceName + resource;
+  
   log.info(`Calling ${url} with Accept: ${acceptHeader}`);
+
   const req = request
     .get(url)
     .accept(acceptHeader);
 
-  if (bearerToken) {
+  if(bearerToken) {
     log.info('Using bearer token:', bearerToken);
     req.set('Authorization', `Bearer ${bearerToken}`);
   }
