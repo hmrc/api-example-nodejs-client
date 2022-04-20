@@ -11,13 +11,17 @@ It accesses three endpoints, each with their own authorisation requirements:
 
 The implementation of the Hello User flow requests an OAuth 2.0 token and subsequently uses that token to access the dummy secured endpoint.
 
-The parameters clientId, clientSecret and serverToken will need to be updated in [`app.js`](app.js)
+API documentation is available on the [HMRC Developer Hub](https://developer.service.hmrc.gov.uk/api-documentation).
 
-You will need to add the Redirect URI 'http://localhost:8080' to your application ('https://developer.service.hmrc.gov.uk/developer/applications/').
+## Setup
+1. [Register for a developer account](https://developer.service.hmrc.gov.uk/developer/registration) on the HMRC Developer Hub 
+1. Create a new application on the Developer Hub, and when prompted to subscribe to some APIs select the **Hello World** API only
+1. Once the application has been created you will be given a Client ID and prompted to generate a Client Secret - take note of both these values
+1. Select your application from the [View all applications page](https://developer.service.hmrc.gov.uk/developer/applications)
+1. Select the **Redirect URIs** link and then click **Add a redirect URL**
+1. Enter the URI value `http://localhost:8080/oauth20/callback`
+1. Within your local copy of this project, edit the [app.js](app.js) file, updating the `clientId` and `clientSecret` variables with the values noted previously
 
-API documentation is available at https://developer.service.hmrc.gov.uk/api-documentation
-
-Application developers need to register with the platform and will be provided with key, secret and tokens upon registration.
 
 The node dependencies can be installed locally by running:
 ```
@@ -29,11 +33,8 @@ The server can be started with the following command:
 npm start
 ```
 
-Once running, the application will be available at:
+Once running, the application will be [available here](http://localhost:8080/).
 
-```
-http://localhost:8080/
-```
 
 ### License
 

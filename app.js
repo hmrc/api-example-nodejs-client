@@ -17,9 +17,11 @@
 // Start Client configuration
 const clientId = 'CLIENT_ID_HERE';
 const clientSecret = 'CLIENT_SECRET_HERE';
-const serverToken = 'SERVER_TOKEN_HERE';
 
-const apiBaseUrl = 'https://api.service.hmrc.gov.uk/';
+const useSandbox = true;
+const apiBaseUrlSandbox = 'https://test-api.service.hmrc.gov.uk/';
+const apiBaseUrlProduction = 'https://api.service.hmrc.gov.uk/';
+const apiBaseUrl = useSandbox ? apiBaseUrlSandbox : apiBaseUrlProduction;
 const serviceName = 'hello'
 
 const serviceVersion = '1.0'
@@ -30,7 +32,7 @@ const userRestrictedEndpoint = '/user';
 
 const oauthScope = 'hello';
 
-const { AuthorizationCode } = require('simple-oauth2');
+const { AuthorizationCode, ClientCredentials } = require('simple-oauth2');
 const request = require('superagent');
 const express = require('express');
 const app = express();
@@ -40,7 +42,7 @@ app.set('view engine', 'ejs');
 const dateFormat = require('dateformat');
 const winston = require('winston');
 
-const log = new (winston.Logger)({
+const log = winston.createLogger({
   transports: [
     new (winston.transports.Console)({
       timestamp: () => dateFormat(Date.now(), "isoDateTime"),
@@ -60,7 +62,7 @@ app.use(cookieSession({
   maxAge: 10 * 60 * 60 * 1000 // 10 hours
 }));
 
-const client = new AuthorizationCode({
+const oauthConfig = {
   client: {
     id: clientId,
     secret: clientSecret,
@@ -70,7 +72,9 @@ const client = new AuthorizationCode({
     tokenPath: '/oauth/token',
     authorizePath: '/oauth/authorize',
   },
-});
+};
+
+const client = new AuthorizationCode(oauthConfig);
 
 const authorizationUri = client.authorizeURL({
   redirect_uri: redirectUri,
@@ -93,8 +97,24 @@ app.get("/unrestrictedCall", (req, res) => {
 });
 
 // Call an application-restricted endpoint
-app.get("/applicationCall", (req, res) => {
-  callApi(appRestrictedEndpoint, res, serverToken);
+app.get("/applicationCall", async (req, res) => {
+  const config = {
+    ...oauthConfig,
+    options: {
+      authorizationMethod: 'body'
+    }
+  };
+
+  const clientCredentials = new ClientCredentials(config);
+  try {
+    const accessTokenDetails = await clientCredentials.getToken({'scope': oauthScope});
+    const accessToken = accessTokenDetails.token.access_token;
+
+    callApi(appRestrictedEndpoint, res, accessToken);
+
+  } catch (error) {
+    return res.status(500).json('Authentication failed');
+  }
 });
 
 // Call a user-restricted endpoint
@@ -102,7 +122,7 @@ app.get("/userCall", (req, res) => {
   if (req.session.oauth2Token) {
     var accessToken = client.createToken(req.session.oauth2Token);
 
-    log.info('Using token from session: ', accessToken.token);
+    log.info(`Using token from session: ${JSON.stringify(accessToken.token)}`);
 
     callApi(userRestrictedEndpoint, res, accessToken.token.access_token);
   } else {
@@ -143,8 +163,8 @@ function callApi(resource, res, bearerToken) {
     .get(url)
     .accept(acceptHeader);
 
-  if(bearerToken) {
-    log.info('Using bearer token:', bearerToken);
+  if (bearerToken) {
+    log.info(`Using bearer token: ${bearerToken}`);
     req.set('Authorization', `Bearer ${bearerToken}`);
   }
 
@@ -153,7 +173,7 @@ function callApi(resource, res, bearerToken) {
 
 function handleResponse(res, err, apiResponse) {
   if (err || !apiResponse.ok) {
-    log.error('Handling error response: ', err);
+    log.error(`Handling error response: ${err}`);
     res.send(err);
   } else {
     res.send(apiResponse.body);
