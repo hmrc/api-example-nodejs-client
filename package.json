@@ -10,7 +10,7 @@
     "dateformat": "2.0.0",
     "debug": "^4.3.1",
     "ejs": "3.1.6",
-    "express": "4.17.1",
+    "express": "4.17.3",
     "simple-oauth2": "4.2.0",
     "superagent": "6.1.0",
     "winston": "^3.7.2"
